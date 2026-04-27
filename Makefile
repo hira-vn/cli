@@ -1,4 +1,4 @@
-.PHONY: dev server daemon cli hira build test migrate-up migrate-down sqlc seed clean setup start stop check worktree-env setup-main start-main stop-main check-main setup-worktree start-worktree stop-worktree check-worktree db-up db-down selfhost selfhost-stop
+.PHONY: dev server daemon cli hira build test migrate-up migrate-down sqlc clean setup start stop check worktree-env setup-main start-main stop-main check-main setup-worktree start-worktree stop-worktree check-worktree db-up db-down selfhost selfhost-stop
 
 MAIN_ENV_FILE ?= .env
 WORKTREE_ENV_FILE ?= .env.worktree
@@ -13,14 +13,9 @@ POSTGRES_USER ?= hira
 POSTGRES_PASSWORD ?= hira
 POSTGRES_PORT ?= 5432
 PORT ?= 8080
-FRONTEND_PORT ?= 3000
-FRONTEND_ORIGIN ?= http://localhost:$(FRONTEND_PORT)
+FRONTEND_ORIGIN ?= http://localhost:3000
 HIRA_APP_URL ?= $(FRONTEND_ORIGIN)
 DATABASE_URL ?= postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@localhost:$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable
-NEXT_PUBLIC_API_URL ?= http://localhost:$(PORT)
-NEXT_PUBLIC_WS_URL ?= ws://localhost:$(PORT)/ws
-GOOGLE_REDIRECT_URI ?= $(FRONTEND_ORIGIN)/auth/callback
-HIRA_SERVER_URL ?= ws://localhost:$(PORT)/ws
 
 export
 
@@ -63,8 +58,7 @@ selfhost:
 	@if curl -sf http://localhost:$${PORT:-8080}/health > /dev/null 2>&1; then \
 		echo ""; \
 		echo "✓ Hira is running!"; \
-		echo "  Frontend: http://localhost:$${FRONTEND_PORT:-3000}"; \
-		echo "  Backend:  http://localhost:$${PORT:-8080}"; \
+		echo "  Backend: http://localhost:$${PORT:-8080}"; \
 		echo ""; \
 		echo "Log in: configure RESEND_API_KEY in .env for email codes,"; \
 		echo "        or set APP_ENV=development in .env (private networks only) to enable code 888888."; \
@@ -86,47 +80,35 @@ selfhost-stop:
 
 # ---------- One-click commands ----------
 
-# First-time setup: install deps, start DB, run migrations
+# First-time setup: start DB, run migrations
 setup:
 	$(REQUIRE_ENV)
 	@echo "==> Using env file: $(ENV_FILE)"
-	@echo "==> Installing dependencies..."
-	pnpm install
 	@bash scripts/ensure-postgres.sh "$(ENV_FILE)"
 	@echo "==> Running migrations..."
 	cd server && go run ./cmd/migrate up
 	@echo ""
-	@echo "✓ Setup complete! Run 'make start' to launch the app."
+	@echo "✓ Setup complete! Run 'make start' to launch the server."
 
-# Start all services (backend + frontend)
+# Start the backend server
 start:
 	$(REQUIRE_ENV)
 	@echo "Using env file: $(ENV_FILE)"
 	@echo "Backend: http://localhost:$(PORT)"
-	@echo "Frontend: http://localhost:$(FRONTEND_PORT)"
 	@bash scripts/ensure-postgres.sh "$(ENV_FILE)"
 	@echo "Running migrations..."
 	cd server && go run ./cmd/migrate up
-	@echo "Starting backend and frontend..."
-	@trap 'kill 0' EXIT; \
-		(cd server && go run ./cmd/server) & \
-		pnpm dev:web & \
-		wait
+	@echo "Starting server..."
+	cd server && go run ./cmd/server
 
-# Stop all services
+# Stop server process
 stop:
 	$(REQUIRE_ENV)
-	@echo "Stopping services..."
-	@-lsof -ti:$(PORT) | xargs kill -9 2>/dev/null
-	@-lsof -ti:$(FRONTEND_PORT) | xargs kill -9 2>/dev/null
-	@case "$(DATABASE_URL)" in \
-		""|*@localhost:*|*@localhost/*|*@127.0.0.1:*|*@127.0.0.1/*|*@\[::1\]:*|*@\[::1\]/*) \
-			echo "✓ App processes stopped. Shared PostgreSQL is still running on localhost:$(POSTGRES_PORT)." ;; \
-		*) \
-			echo "✓ App processes stopped. Remote PostgreSQL was not affected." ;; \
-	esac
+	@echo "Stopping server..."
+	@-lsof -ti:$(PORT) | xargs kill -9 2>/dev/null || true
+	@echo "✓ Server stopped."
 
-# Full verification: typecheck + unit tests + Go tests + E2E
+# Run Go tests
 check:
 	$(REQUIRE_ENV)
 	@ENV_FILE="$(ENV_FILE)" bash scripts/check.sh
@@ -172,7 +154,7 @@ check-worktree:
 
 # ---------- Individual commands ----------
 
-# One-command dev: auto-setup env/deps/db/migrations, then start all services
+# One-command dev: auto-setup env/db/migrations, then start server
 dev:
 	@bash scripts/dev.sh
 

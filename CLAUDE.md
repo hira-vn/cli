@@ -1,375 +1,106 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
 
 ## Project Context
 
-Hira is an AI-native task management platform — like Linear, but with AI agents as first-class citizens.
+This repo is the **Go backend and CLI binary** for Hira — an AI-native task management platform where coding agents are first-class teammates.
 
-- Agents can be assigned issues, create issues, comment, and change status
-- Supports local (daemon) and cloud agent runtimes
-- Built for 2-10 person AI-native teams
+**What lives here:**
+- `server/cmd/hira/` — the `hira` CLI binary (Cobra)
+- `server/cmd/server/` — the HTTP/WebSocket API server (Chi + gorilla/websocket)
+- `server/cmd/migrate/` — database migration runner
+- `server/internal/` — business logic (auth, daemon, handlers, realtime, services)
+- `server/pkg/` — shared packages (agent protocol, sqlc DB layer, knowledge)
+- `server/migrations/` — PostgreSQL migrations (immutable — never rewrite history)
+- `scripts/` — dev, install, and CI helper scripts
+- `.goreleaser.yml` + `.github/workflows/release.yml` — release pipeline
+
+**What does NOT live here:** the Next.js frontend. It's a separate repo.
 
 ## Architecture
 
-**Go backend + monorepo frontend (pnpm workspaces + Turborepo) with shared packages.**
+```
+server/
+  cmd/hira/      CLI entry point — Cobra commands for auth, daemon, issues, etc.
+  cmd/server/    API server — Chi router, WebSocket hub, background workers
+  cmd/migrate/   Migration runner — up/down via golang-migrate
+  internal/
+    auth/        JWT, cookies, OAuth flow
+    cli/         CLI config (~/.hira/config.json), profile management
+    daemon/      Local agent runtime — process management, workspace isolation
+    events/      In-process event bus
+    handler/     HTTP route handlers
+    middleware/  Auth middleware, workspace scoping
+    realtime/    WebSocket hub
+    service/     Business services (task, email, autopilot, storage)
+  pkg/
+    agent/       Agent protocol types
+    db/          sqlc-generated DB layer + queries
+    knowledge/   Knowledge context rendering for agents
+    protocol/    Shared protocol types
+```
 
-- `server/` — Go backend (Chi router, sqlc for DB, gorilla/websocket for real-time)
-- `apps/web/` — Next.js frontend (App Router)
-- `packages/core/` — Headless business logic (zero react-dom, all-platform reuse)
-- `packages/ui/` — Atomic UI components (zero business logic)
-- `packages/views/` — Shared business pages/components (zero next/* imports, zero react-router imports)
-- `packages/tsconfig/` — Shared TypeScript configuration
+**Multi-tenancy:** all queries filter by `workspace_id`. Membership checks gate access. `X-Workspace-ID` header routes requests to the correct workspace.
 
-### Key Architectural Decisions
-
-**Internal Packages pattern** — all shared packages export raw `.ts`/`.tsx` files (no pre-compilation). The consuming app's bundler compiles them directly. This gives zero-config HMR and instant go-to-definition.
-
-**Dependency direction:** `views/ → core/ + ui/`. Core and UI are independent of each other. No package imports from `next/*`, `react-router-dom`, or app-specific code.
-
-**Platform bridge:** `packages/core/platform/` provides `CoreProvider` — initializes API client, auth/workspace stores, WS connection, and QueryClient. The app wraps its root with `<CoreProvider>` and provides its own `NavigationAdapter` for routing.
-
-**pnpm catalog** — `pnpm-workspace.yaml` defines `catalog:` for version pinning. All shared deps use `catalog:` references to guarantee a single version across all packages. When adding new shared deps (including test deps), add to catalog first.
-
-### State Management
-
-The architecture relies on a strict split between server state and client state. Mixing them is the most common way to break it.
-
-- **TanStack Query owns all server state.** Issues, users, workspaces, inbox — anything fetched from the API lives in the Query cache. WS events keep it fresh via invalidation; no polling, no `staleTime` workarounds.
-- **Zustand owns all client state.** UI selections, filters, drafts, modal state, navigation history. Stores live in `packages/core/` (never in `packages/views/`) so they remain platform-agnostic.
-- **React Context** is reserved for cross-cutting platform plumbing — `WorkspaceIdProvider`, `NavigationProvider`. Don't reach for it for general state.
-- **Auth and workspace stores are the only stores allowed to call `api.*` directly**, because they manage critical state that must exist before queries can run. They're created via factory + injected dependencies, registered by the platform layer.
-
-**Hard rules — these are how the architecture stays coherent:**
-
-- **Never duplicate server data into Zustand.** If it came from the API, it belongs in the Query cache. Copying it into a store creates two sources of truth and they will drift.
-- **Workspace-scoped queries must key on `wsId`.** This is what makes workspace switching automatic — the cache key changes, the right data appears, no manual invalidation needed.
-- **Mutations are optimistic by default.** Apply the change locally, send the request, roll back on failure, invalidate on settle. The user shouldn't wait for the server.
-- **WS events invalidate queries — they never write to stores directly.** This keeps the cache as the single source of truth and avoids race conditions.
-- **Persist what's worth preserving across restarts** (user preferences, drafts, tab layout). **Don't persist ephemeral UI state** (modal open/close, transient selections) or server data.
-
-**Common Zustand footguns to avoid:**
-
-- Selectors must return stable references. Returning a freshly built object or array on every call (e.g. `s => ({ a: s.a, b: s.b })` or `s => s.items.map(...)`) triggers infinite re-renders. Either select primitives separately or use shallow comparison.
-- Hooks that need workspace context should accept `wsId` as a parameter, not call `useWorkspaceId()` internally — this lets them work outside the `WorkspaceIdProvider` (e.g. in a sidebar that renders before workspace is loaded).
+**Agent lifecycle:** daemon polls the server for claimed tasks → spawns the agent CLI in an isolated workspace dir → streams results back via WebSocket.
 
 ## Commands
 
 ```bash
-# One-command dev (auto-setup + start everything)
-make dev              # Auto-creates env, installs deps, starts DB, migrates, launches app
+# Dev (auto-setup env/DB/migrations, start server)
+make dev
 
-# Explicit setup & run (if you prefer separate steps)
-make setup            # First-time: ensure shared DB, create app DB, migrate
-make start            # Start backend + frontend together
-make stop             # Stop app processes for the current checkout
-make db-down          # Stop the shared PostgreSQL container
+# Explicit setup and run
+make setup           # Start DB, run migrations
+make start           # Start API server (port 8080)
+make stop            # Stop server process
 
-# Frontend (all commands go through Turborepo)
-pnpm install
-pnpm dev:web          # Next.js dev server (port 3000)
-pnpm build            # Build all frontend apps
-pnpm typecheck        # TypeScript check (all packages + apps via turbo)
-pnpm lint             # ESLint
-pnpm test             # TS tests (Vitest, all packages + apps via turbo)
+# Individual services
+make server          # Run API server only
+make daemon          # Run local daemon (profile=local)
+make hira ARGS="..." # Run CLI (e.g. make hira ARGS="daemon status")
+make build           # Build all binaries to server/bin/
 
-# Backend (Go)
-make server           # Run Go server only (port 8080)
-make daemon           # Run local daemon
-make build            # Build server + CLI binaries to server/bin/
-make cli ARGS="..."   # Run hira CLI (e.g. make cli ARGS="config")
-make test             # Go tests
-make sqlc             # Regenerate sqlc code after editing SQL in server/pkg/db/queries/
-make migrate-up       # Run database migrations
-make migrate-down     # Rollback migrations
+# Testing
+make test            # Run Go tests (requires DB)
+make check           # Full check: migrations + go test
 
-# Run a single TS test (works for any package with a test script)
-pnpm --filter @hira/views exec vitest run auth/login-page.test.tsx
-pnpm --filter @hira/core exec vitest run runtimes/version.test.ts
-pnpm --filter @hira/web exec vitest run app/\(auth\)/login/page.test.tsx
+# Database
+make migrate-up      # Run pending migrations
+make migrate-down    # Roll back last migration
+make sqlc            # Regenerate sqlc code after editing server/pkg/db/queries/
+
+# Self-host (Docker Compose)
+make selfhost        # Start full stack
+make selfhost-stop   # Stop all services
 
 # Run a single Go test
 cd server && go test ./internal/handler/ -run TestName
-
-# Run a single E2E test (requires backend + frontend running)
-pnpm exec playwright test e2e/tests/specific-test.spec.ts
-
-# shadcn — config lives in packages/ui/components.json (Base UI variant, base-nova style)
-pnpm ui:add badge                # Adds component to packages/ui/components/ui/
-
-# Infrastructure
-make db-up            # Start shared PostgreSQL (pgvector/pg17 image)
-make db-down          # Stop shared PostgreSQL
-```
-
-### CI Requirements
-
-CI runs on Node 22 and Go 1.26.1 with a `pgvector/pgvector:pg17` PostgreSQL service. See `.github/workflows/ci.yml`.
-
-### Worktree Support
-
-All checkouts share one PostgreSQL container. Isolation is at the database level — each worktree gets its own DB name and unique ports via `.env.worktree`. Main checkouts use `.env`.
-
-`make dev` auto-detects worktrees and handles everything. For explicit control:
-
-```bash
-make worktree-env       # Generate .env.worktree with unique DB/ports
-make setup-worktree     # Setup using .env.worktree
-make start-worktree     # Start using .env.worktree
 ```
 
 ## Coding Rules
 
-- TypeScript strict mode is enabled; keep types explicit.
-- Go code follows standard Go conventions (gofmt, go vet).
+- Go code follows standard conventions (`gofmt`, `go vet`).
 - Keep comments in code **English only**.
-- Prefer existing patterns/components over introducing parallel abstractions.
-- Unless the user explicitly asks for backwards compatibility, do **not** add compatibility layers, fallback paths, dual-write logic, legacy adapters, or temporary shims.
-- If a flow or API is being replaced and the product is not yet live, prefer removing the old path instead of preserving both old and new behavior.
+- Prefer existing patterns over new abstractions.
+- Do not add backwards-compatibility layers, fallbacks, or dual-write logic unless explicitly asked.
+- If something is being replaced and the product is not yet live, remove the old path instead of keeping both.
 - Avoid broad refactors unless required by the task.
-- New global (pre-workspace) routes MUST use a single word (`/login`, `/inbox`) or a `/{noun}/{verb}` pair (`/workspaces/new`). NEVER add hyphenated word-group root routes (`/new-workspace`, `/create-team`) — they collide with common user workspace names and force endless reserved-slug audits. Reserving the noun (`workspaces`) automatically protects the entire `/workspaces/*` subtree.
 
-### Package Boundary Rules
+## Migrations
 
-These are hard constraints. Violating them breaks the cross-platform architecture:
-
-- `packages/core/` — zero react-dom, zero localStorage (use StorageAdapter), zero process.env, zero UI libraries. **All shared Zustand stores live here**, even view-related ones (filters, view modes) — stores are pure state, not UI.
-- `packages/ui/` — zero `@hira/core` imports (pure UI, no business logic).
-- `packages/views/` — zero `next/*` imports, zero `react-router-dom` imports, zero stores. Use `NavigationAdapter` for all routing.
-- `apps/web/platform/` — the only place for Next.js APIs (`next/navigation`).
-
-### The No-Duplication Rule
-
-**Business logic and shared UI must live in `packages/` — never inline inside `apps/web/`.**
-
-This applies to everything: components, hooks, guards, providers, utility functions. The decision process:
-
-1. Does this code depend on Next.js APIs (`next/navigation`, `next/link`, etc.)? → Keep in `apps/web/`.
-2. Everything else → belongs in `packages/core/` (headless logic) or `packages/views/` (UI components).
-
-The `packages/views/` + `NavigationAdapter` split is preserved intentionally: it keeps business components framework-agnostic and makes shared logic easy to test without a Next.js runtime.
-
-### Development Rules
-
-When adding a new page or feature:
-
-1. **New page component** → add to `packages/views/<domain>/`. Never import from `next/*` or `react-router-dom`.
-2. **Wire it in the web app** → add a route in `apps/web/app/` (Next.js page file) that renders the shared view.
-3. **Navigation** → use `useNavigation().push()` or `<AppLink>`. Never use framework-specific link/router APIs in shared code.
-4. **Shared guards/providers** → use `DashboardGuard` from `packages/views/layout/`. Keep guard logic in shared packages.
-5. **Platform-specific UI** → web-only chrome (cookies, SSR-specific wiring) stays in `apps/web/`. Use props slots (`extra`, `topSlot`) on shared layout components to inject platform UI.
-6. **New hooks that need workspace context** → accept `wsId` as parameter instead of reading from `useWorkspaceId()` Context, so they work both inside and outside `WorkspaceIdProvider`.
-
-### CSS Architecture
-
-The web app builds on the CSS foundation in `packages/ui/styles/`.
-
-- **Design tokens** → use semantic tokens (`bg-background`, `text-muted-foreground`). Never use hardcoded Tailwind colors (`text-red-500`, `bg-gray-100`).
-- **Shared styles** → `packages/ui/styles/`. Never duplicate scrollbar styling, keyframes, or base layer rules in app CSS.
-- **`@source` directives** → the app scans shared packages so Tailwind sees all class names.
-
-#### Color tokens: 3 vai trò, không gộp
-
-Mỗi màu gốc đi đúng một vai trò — dev tương lai không tự diễn giải:
-
-| Vai trò | Token | Khi nào dùng |
-|---|---|---|
-| **Selection** (persistent active row) | `.hira-selected` class (wash + inset border + text shift) | List item đang được chọn trong split-pane (docs, agents, skills, issues, inbox) |
-| **Action** (primary CTA) | Button `variant="default"` → `--indigo` fill | Submit, Confirm, primary nav CTA |
-| **Identity** (brand outline) | `ring-primary` / `border-primary` | Focus ring, sidebar active chevron, workspace avatar |
-| **Decorative** (hero, badge) | `--amber`, `--amber-sand` | Landing hero gradient, marketing badges — **không** dùng trong dashboard list |
-
-Pattern chuẩn cho selected list item:
-
-```tsx
-className={cn(
-  "cursor-pointer p-3 transition-colors",
-  isSelected ? "hira-selected" : "hover:bg-muted",
-)}
-```
-
-Reference: `packages/views/agents/components/agent-list-item.tsx:27`, `packages/views/skills/components/skills-page.tsx:242`.
-
-##### ❌ Anti-patterns — không làm
-
-```tsx
-// ❌ Solid fill cho selected — lệch ngôn ngữ, nền đè text
-<li className={selected ? "bg-accent" : ""} />
-
-// ❌ Hardcode amber/yellow làm active nav
-<a className="bg-amber-100 text-amber-900" />
-
-// ❌ Tự reimplement .hira-selected — drift khỏi class gốc
-<li className={selected ? "bg-indigo-50 border-l-2 border-indigo-600 text-indigo-900" : ""} />
-
-// ❌ Solid indigo fill cho selection — quá mạnh
-<li className={selected ? "bg-primary text-primary-foreground" : ""} />
-```
-
-##### ✅ Khi nào được thêm token mới
-
-Chỉ thêm CSS var vào `packages/ui/styles/tokens.css` khi **tất cả 3** điều kiện đúng:
-
-1. Đã có role chưa được phủ (vd "danger" cho destructive action — không trùng selection/action/identity/decorative).
-2. Sẽ được dùng ≥ 3 nơi trong 30 ngày tới (nếu chỉ 1 nơi → dùng Tailwind semantic như `text-destructive`).
-3. Có document rõ trong guideline này (thêm row vào bảng vai trò).
-
-Nếu không, reuse token hiện có. Landing page có quyền phóng khoáng hơn với amber/decorative vì context marketing khác với dashboard.
-
-## Workspace Identity
-
-`setCurrentWorkspace(slug, uuid)` in `@hira/core/platform` is the single source of truth for "which workspace is active right now". Three consumers depend on it:
-
-1. API client's `X-Workspace-Slug` header.
-2. Zustand per-workspace storage namespace.
-3. Chrome gating (e.g. `{slug && <AppSidebar />}`).
-
-Normally set by `WorkspaceRouteLayout` when its route mounts. Critically: **unmount does NOT clear it.** Any code that leaves workspace context (leave workspace, delete workspace, force navigation to overlay) must call `setCurrentWorkspace(null, null)` explicitly — otherwise the realtime `workspace:deleted` handler races the mutation, chrome gating stays truthy while the workspace is gone from cache, and `useWorkspaceId` throws.
-
-### Workspace destructive operations
-
-Leave / Delete workspace flows must follow this order:
-
-1. Read destination from cached workspace list (no extra fetch).
-2. `setCurrentWorkspace(null, null)`.
-3. `navigation.push(destination)` — switch to next workspace or open new-workspace route.
-4. THEN `await mutation.mutateAsync(workspaceId)`.
-
-Reversing step 4 with steps 1–3 (mutate first, navigate after) causes a three-way race between the mutation's `onSettled` invalidate, the explicit `navigateAway`, and the realtime handler's `relocateAfterWorkspaceLoss` — all refetching the same `workspaces` query concurrently. One gets cancelled, bubbles as `CancelledError`, and triggers `window.location.assign` → full page reload / white screen.
-
-## UI/UX Rules
-
-- Prefer shadcn components over custom implementations. Install via `pnpm ui:add <component>` from project root — adds to `packages/ui/components/ui/`. All components use Base UI primitives (`@base-ui/react`), not Radix.
-- Use shadcn design tokens for styling. Avoid hardcoded color values.
-- Do not introduce extra state (useState, context, reducers) unless explicitly required by the design.
-- Pay close attention to **overflow** (truncate long text, scrollable containers), **alignment**, and **spacing** consistency.
-- **Business / view components belong in `packages/views/`, atomic UI in `packages/ui/`.** Keep `apps/web/` focused on Next.js wiring.
-
-## Testing Rules
-
-### Where to write tests
-
-Tests follow the code, not the app. This is the most important testing principle in this monorepo:
-
-| What you're testing | Where the test lives | Why |
-|---|---|---|
-| Shared business logic (stores, queries, hooks) | `packages/core/*.test.ts` | No DOM needed, pure logic |
-| Shared UI components (pages, forms, modals) | `packages/views/*.test.tsx` | jsdom, no framework mocks |
-| Platform-specific wiring (cookies, redirects, searchParams) | `apps/web/*.test.tsx` | Needs framework-specific mocks |
-| End-to-end user flows | `e2e/*.spec.ts` | Real browser, real backend |
-
-**Never test shared component behavior in an app's test file.** If a test requires mocking `next/navigation` to test a component from `@hira/views`, the test is in the wrong place — move it to `packages/views/` and mock `@hira/core` instead.
-
-### Test infrastructure
-
-- `packages/core/` — Vitest, Node environment (no DOM)
-- `packages/views/` — Vitest, jsdom environment, `@testing-library/react`
-- `apps/web/` — Vitest, jsdom environment, framework-specific mocks
-- `e2e/` — Playwright (requires backend + frontend running)
-- `server/` — Go standard `go test`
-
-All test deps are in the pnpm catalog for unified versioning.
-
-### Mocking conventions
-
-- Mock `@hira/core` stores with `vi.hoisted()` + `Object.assign(selectorFn, { getState })` pattern (Zustand stores are both callable and have `.getState()`).
-- Mock `@hira/core/api` for API calls.
-- In `packages/views/` tests: never mock `next/*` — those don't exist here.
-- In `apps/web/` tests: mock framework-specific APIs only for platform-specific behavior.
-
-### TDD workflow
-
-1. Write failing test in the **correct package** first.
-2. Write implementation.
-3. Run `pnpm test` (Turborepo discovers all packages).
-4. Green → done.
-
-### Go tests
-
-Standard `go test`. Tests should create their own fixture data in a test database.
-
-### E2E tests
-
-E2E tests should be self-contained. Use the `TestApiClient` fixture for data setup/teardown:
-
-```typescript
-import { loginAsDefault, createTestApi } from "./helpers";
-import type { TestApiClient } from "./fixtures";
-
-let api: TestApiClient;
-
-test.beforeEach(async ({ page }) => {
-  api = await createTestApi();
-  await loginAsDefault(page);
-});
-
-test.afterEach(async () => {
-  await api.cleanup();
-});
-
-test("example", async ({ page }) => {
-  const issue = await api.createIssue("Test Issue");
-  await page.goto(`/issues/${issue.id}`);
-});
-```
-
-## Commit Rules
-
-- Use atomic commits grouped by logical intent.
-- Conventional format: `feat(scope)`, `fix(scope)`, `refactor(scope)`, `docs`, `test(scope)`, `chore(scope)`.
-
-## Minimum Pre-Push Checks
-
-```bash
-make check    # Runs all checks: typecheck, unit tests, Go tests, E2E
-```
-
-Run verification only when the user explicitly asks for it.
-
-For targeted checks when requested:
-```bash
-pnpm typecheck        # TypeScript type errors only
-pnpm test             # TS unit tests only (Vitest, all packages)
-make test             # Go tests only
-pnpm exec playwright test   # E2E only (requires backend + frontend running)
-```
-
-## AI Agent Verification Loop
-
-After writing or modifying code, always run the full verification pipeline:
-
-```bash
-make check
-```
-
-**Workflow:**
-- Write code to satisfy the requirement
-- Run `make check`
-- If any step fails, read the error output, fix the code, and re-run
-- Repeat until all checks pass
-- Only then consider the task complete
-
-**Quick iteration:** If you know only TypeScript or Go is affected, run individual checks first for faster feedback, then finish with a full `make check` before marking work complete.
+`server/migrations/*.sql` files are **immutable**. Never rewrite or delete migration files — they are the historical record of schema changes. Add a new migration instead.
 
 ## CLI Release
 
-**Prerequisite:** A CLI release must accompany every Production deployment.
+1. Create a tag on `main`: `git tag v0.x.x`
+2. Push: `git push origin v0.x.x`
+3. GitHub Actions triggers `release.yml`: runs Go tests → GoReleaser builds multi-platform binaries → publishes to GitHub Releases + updates the Homebrew tap
 
-1. Create a tag on the `main` branch: `git tag v0.x.x`
-2. Push the tag: `git push origin v0.x.x`
-3. GitHub Actions automatically triggers `release.yml`: runs Go tests → GoReleaser builds multi-platform binaries → publishes to GitHub Releases + Homebrew tap
+Bump the patch version by default (`v0.1.12` → `v0.1.13`).
 
-By default, bump the patch version each release (e.g. `v0.1.12` → `v0.1.13`), unless the user specifies a specific version.
+## Commit Rules
 
-## Multi-tenancy
-
-All queries filter by `workspace_id`. Membership checks gate access. `X-Workspace-ID` header routes requests to the correct workspace.
-
-## Agent Assignees
-
-Assignees are polymorphic — can be a member or an agent. `assignee_type` + `assignee_id` on issues. Agents render with distinct styling (purple background, robot icon).
-ound, robot icon).
-).
-ound, robot icon).
-).
-ound, robot icon).
+- Atomic commits grouped by logical intent.
+- Conventional format: `feat(scope)`, `fix(scope)`, `refactor(scope)`, `docs`, `test(scope)`, `chore(scope)`.

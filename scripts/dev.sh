@@ -6,14 +6,12 @@ cd "$REPO_ROOT"
 
 # ---------- Check prerequisites ----------
 missing=()
-command -v node >/dev/null 2>&1 || missing+=("node")
-command -v pnpm >/dev/null 2>&1 || missing+=("pnpm")
 command -v go >/dev/null 2>&1 || missing+=("go")
 command -v docker >/dev/null 2>&1 || missing+=("docker")
 
 if [ ${#missing[@]} -gt 0 ]; then
   echo "✗ Missing prerequisites: ${missing[*]}"
-  echo "  Please install: Node.js v20+, pnpm v10.28+, Go v1.26+, Docker"
+  echo "  Please install: Go v1.24+, Docker"
   exit 1
 fi
 
@@ -40,36 +38,16 @@ set -a
 . "$ENV_FILE"
 set +a
 
-# ---------- Install dependencies ----------
-# Re-install either when node_modules is missing entirely, or when the
-# lockfile has been updated since the last install (common after `git pull`
-# adds a new workspace dependency).
-needs_install=false
-if [ ! -d node_modules ]; then
-  needs_install=true
-elif [ "pnpm-lock.yaml" -nt "node_modules/.pnpm" ] 2>/dev/null; then
-  echo "==> pnpm-lock.yaml is newer than node_modules — re-syncing..."
-  needs_install=true
-fi
-if [ "$needs_install" = true ]; then
-  echo "==> Installing dependencies..."
-  pnpm install
-fi
-
 # ---------- Database ----------
 bash scripts/ensure-postgres.sh "$ENV_FILE"
 
 echo "==> Running migrations..."
 (cd server && go run ./cmd/migrate up)
 
-# ---------- Start services ----------
+# ---------- Start server ----------
 echo ""
-echo "✓ Ready. Starting services..."
-echo "  Backend:  http://localhost:${PORT:-8080}"
-echo "  Frontend: http://localhost:${FRONTEND_PORT:-3000}"
+echo "✓ Ready. Starting server..."
+echo "  Backend: http://localhost:${PORT:-8080}"
 echo ""
 
-trap 'kill 0' EXIT
-(cd server && go run ./cmd/server) &
-pnpm dev:web &
-wait
+cd server && go run ./cmd/server
