@@ -1,0 +1,98 @@
+version: 2
+
+project_name: hira
+
+before:
+  hooks:
+    - sh -c 'cd server && go mod download'
+
+builds:
+  - id: hira
+    main: ./cmd/hira
+    dir: server
+    binary: hira
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: hira
+    formats: [tar.gz]
+    name_template: "hira_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE*
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+  groups:
+    - title: Features
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: Bug fixes
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: Refactors
+      regexp: "^.*refactor[(\\w)]*:+.*$"
+      order: 2
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: hira-vn
+    name: cli
+  draft: false
+  prerelease: auto
+  mode: replace
+  name_template: "Hira CLI {{.Tag}}"
+
+brews:
+  - name: cli
+    repository:
+      owner: hira-vn
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/hira-vn/cli"
+    description: "Hira CLI — local agent runtime and management tool"
+    license: Apache-2.0
+    commit_author:
+      name: hira-bot
+      email: noreply@hira.vn
+    commit_msg_template: "chore(formula): bump cli to {{ .Tag }}"
+    install: |
+      bin.install "hira"
+    test: |
+      system "#{bin}/hira", "--version"
