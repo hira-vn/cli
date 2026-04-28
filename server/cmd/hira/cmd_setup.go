@@ -17,7 +17,7 @@ import (
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Configure the CLI, authenticate, and start the daemon",
-	Long: `Configures the CLI to connect to Hira Cloud (hira.vn), then
+	Long: `Configures the CLI to connect to Hira Cloud (app.hira.vn), then
 authenticates via browser and starts the agent daemon.
 
 If a configuration already exists, you will be prompted before overwriting.
@@ -31,8 +31,8 @@ Use --profile to create an isolated configuration for a separate environment:
 
 var setupCloudCmd = &cobra.Command{
 	Use:   "cloud",
-	Short: "Configure the CLI for Hira Cloud (hira.vn)",
-	Long: `Explicitly configures the CLI to connect to Hira Cloud (hira.vn).
+	Short: "Configure the CLI for Hira Cloud (app.hira.vn)",
+	Long: `Explicitly configures the CLI to connect to Hira Cloud (app.hira.vn).
 
 This is equivalent to running 'hira setup' without a subcommand.`,
 	RunE: runSetupCloud,
@@ -117,7 +117,7 @@ func runSetupCloud(cmd *cobra.Command, args []string) error {
 	}
 
 	cfg := cli.CLIConfig{
-		ServerURL: "https://api.hira.vn",
+		ServerURL: "https://app.hira.vn",
 		AppURL:    "https://app.hira.vn",
 	}
 	if err := cli.SaveCLIConfigForProfile(cfg, profile); err != nil {
