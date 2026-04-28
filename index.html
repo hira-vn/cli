@@ -1,0 +1,1389 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>git.hira.vn — Hira CLI Reference</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --indigo: #4F46E5;
+      --deep: #3730A3;
+      --mist: #EEF2FF;
+      --amber: #F59E0B;
+      --sand: #FEF3C7;
+      --obsidian: #0F172A;
+      --slate: #475569;
+      --slate-soft: #64748B;
+      --border: #E2E8F0;
+      --paper: #F8FAFC;
+      --white: #FFFFFF;
+      --mint: #10B981;
+      --coral: #EF4444;
+      --fd: 'Space Grotesk', system-ui, sans-serif;
+      --fb: 'Inter', system-ui, sans-serif;
+      --fm: 'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    html {
+      scroll-behavior: smooth
+    }
+
+    body {
+      font-family: var(--fb);
+      color: var(--obsidian);
+      background: var(--white);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.55;
+      font-size: 15px
+    }
+
+    a {
+      color: var(--indigo);
+      text-decoration: none
+    }
+
+    a:hover {
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 3px
+    }
+
+    code,
+    pre,
+    kbd {
+      font-family: var(--fm)
+    }
+
+    /* Top bar */
+    .topbar {
+      height: 56px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 24px;
+      background: var(--white);
+      position: sticky;
+      top: 0;
+      z-index: 50
+    }
+
+    .logo {
+      font-family: var(--fd);
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: -.02em;
+      color: var(--obsidian)
+    }
+
+    .logo .dot {
+      color: var(--amber)
+    }
+
+    .logo small {
+      font-family: var(--fm);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--slate-soft);
+      margin-left: 10px;
+      padding-left: 10px;
+      border-left: 1px solid var(--border)
+    }
+
+    .topnav {
+      display: flex;
+      gap: 22px;
+      margin-left: auto
+    }
+
+    .topnav a {
+      color: var(--slate);
+      font-size: 14px;
+      font-weight: 500
+    }
+
+    .topnav a:hover {
+      color: var(--obsidian);
+      text-decoration: none
+    }
+
+    .search {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px 6px 30px;
+      font-family: var(--fm);
+      font-size: 12px;
+      color: var(--slate);
+      width: 220px;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2364748B'><path d='M9 3a6 6 0 014.6 9.9l3.7 3.7a1 1 0 01-1.4 1.4l-3.7-3.7A6 6 0 119 3zm0 2a4 4 0 100 8 4 4 0 000-8z'/></svg>");
+      background-repeat: no-repeat;
+      background-position: 8px center;
+      background-size: 14px
+    }
+
+    .kbd-hint {
+      font-family: var(--fm);
+      font-size: 11px;
+      color: var(--slate-soft);
+      padding: 2px 6px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 4px
+    }
+
+    /* Layout */
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr) 220px;
+      gap: 0;
+      max-width: 1440px;
+      margin: 0 auto
+    }
+
+    @media(max-width:1100px) {
+      .layout {
+        grid-template-columns: 260px 1fr
+      }
+
+      .toc {
+        display: none
+      }
+    }
+
+    @media(max-width:760px) {
+      .layout {
+        grid-template-columns: 1fr
+      }
+
+      .sidebar {
+        display: none
+      }
+    }
+
+    /* Sidebar */
+    .sidebar {
+      border-right: 1px solid var(--border);
+      padding: 28px 0 48px;
+      height: calc(100vh - 56px);
+      position: sticky;
+      top: 56px;
+      overflow-y: auto
+    }
+
+    .sidebar-inner {
+      padding: 0 20px 0 24px
+    }
+
+    .sb-group {
+      margin-bottom: 28px
+    }
+
+    .sb-group h4 {
+      font-family: var(--fb);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: var(--slate);
+      margin-bottom: 8px;
+      padding: 0 8px
+    }
+
+    .sb-group a {
+      display: block;
+      padding: 5px 10px;
+      color: var(--slate);
+      font-size: 13.5px;
+      border-radius: 6px;
+      font-weight: 500
+    }
+
+    .sb-group a:hover {
+      background: var(--paper);
+      color: var(--obsidian);
+      text-decoration: none
+    }
+
+    .sb-group a.active {
+      background: var(--mist);
+      color: var(--deep);
+      font-weight: 600
+    }
+
+    .sb-group a .ver {
+      font-family: var(--fm);
+      font-size: 10px;
+      color: var(--slate-soft);
+      margin-left: 6px
+    }
+
+    /* Content */
+    main {
+      padding: 48px 56px;
+      max-width: 880px;
+      min-width: 0
+    }
+
+    @media(max-width:760px) {
+      main {
+        padding: 32px 20px
+      }
+    }
+
+    .crumb {
+      font-size: 12px;
+      color: var(--slate-soft);
+      margin-bottom: 14px;
+      font-family: var(--fm)
+    }
+
+    .crumb .sep {
+      margin: 0 6px;
+      color: var(--border)
+    }
+
+    h1 {
+      font-family: var(--fd);
+      font-size: 44px;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      line-height: 1.1;
+      margin-bottom: 12px
+    }
+
+    h1 .tag {
+      display: inline-block;
+      vertical-align: middle;
+      font-family: var(--fm);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--amber);
+      background: var(--sand);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-left: 12px;
+      line-height: 1;
+      letter-spacing: .02em
+    }
+
+    .lede {
+      font-size: 19px;
+      color: var(--slate);
+      max-width: 60ch;
+      margin: 0 0 24px;
+      line-height: 1.5
+    }
+
+    .meta {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      color: var(--slate-soft);
+      font-size: 12px;
+      font-family: var(--fm);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 0;
+      margin-bottom: 36px
+    }
+
+    .meta span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .meta b {
+      color: var(--obsidian);
+      font-weight: 600
+    }
+
+    h2 {
+      font-family: var(--fd);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -.015em;
+      margin: 48px 0 14px;
+      padding-top: 16px;
+      scroll-margin-top: 72px
+    }
+
+    h2::before {
+      content: '#';
+      color: var(--border);
+      margin-right: 10px;
+      font-weight: 500
+    }
+
+    h3 {
+      font-family: var(--fd);
+      font-size: 18px;
+      font-weight: 600;
+      margin: 28px 0 10px;
+      scroll-margin-top: 72px;
+      color: var(--obsidian)
+    }
+
+    p {
+      margin-bottom: 14px;
+      color: #1E293B
+    }
+
+    p.muted {
+      color: var(--slate)
+    }
+
+    ul,
+    ol {
+      margin: 0 0 14px 24px;
+      color: #1E293B
+    }
+
+    li {
+      margin-bottom: 4px
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 40px 0
+    }
+
+    /* Inline code */
+    code {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: .88em;
+      color: var(--deep)
+    }
+
+    /* Terminal / code blocks */
+    .term {
+      background: var(--obsidian);
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 18px 0;
+      box-shadow: 0 8px 20px -8px rgba(15, 23, 42, .25)
+    }
+
+    .term-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #1E293B;
+      border-bottom: 1px solid #334155
+    }
+
+    .term-head i {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      display: block
+    }
+
+    .term-head i:nth-child(1) {
+      background: #FB7185
+    }
+
+    .term-head i:nth-child(2) {
+      background: #FCD34D
+    }
+
+    .term-head i:nth-child(3) {
+      background: #34D399
+    }
+
+    .term-title {
+      margin-left: auto;
+      font-family: var(--fm);
+      font-size: 11px;
+      color: #94A3B8
+    }
+
+    .term pre {
+      padding: 18px 22px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: #E2E8F0;
+      overflow-x: auto
+    }
+
+    .term .c-p {
+      color: #A78BFA
+    }
+
+    /* prompt */
+    .term .c-c {
+      color: #FCD34D
+    }
+
+    /* command */
+    .term .c-f {
+      color: #6EE7B7
+    }
+
+    /* flag / success */
+    .term .c-s {
+      color: #FDBA74
+    }
+
+    /* string / arg */
+    .term .c-m {
+      color: #94A3B8
+    }
+
+    /* muted / comment */
+    .term .c-e {
+      color: #FCA5A5
+    }
+
+    /* error */
+    .term .c-a {
+      color: #F59E0B
+    }
+
+    /* amber highlight */
+
+    /* Install tabs */
+    .tabs {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 20px 0 8px;
+      background: var(--white)
+    }
+
+    .tab-heads {
+      display: flex;
+      background: var(--paper);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto
+    }
+
+    .tab-heads button {
+      padding: 10px 16px;
+      font-family: var(--fm);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--slate);
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+      position: relative
+    }
+
+    .tab-heads button:hover {
+      color: var(--obsidian)
+    }
+
+    .tab-heads button.on {
+      background: var(--white);
+      color: var(--indigo)
+    }
+
+    .tab-heads button.on::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      background: var(--indigo)
+    }
+
+    .tab-body {
+      display: none
+    }
+
+    .tab-body.on {
+      display: block
+    }
+
+    .tab-body pre {
+      padding: 20px 22px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--obsidian);
+      overflow-x: auto;
+      background: var(--white);
+      position: relative
+    }
+
+    .copy {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      padding: 4px 10px;
+      font-family: var(--fm);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--slate);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all .12s
+    }
+
+    .copy:hover {
+      color: var(--indigo);
+      border-color: var(--indigo)
+    }
+
+    .copy.ok {
+      color: var(--mint);
+      border-color: var(--mint)
+    }
+
+    /* Callouts */
+    .note {
+      border-left: 3px solid var(--indigo);
+      background: var(--mist);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 18px 0;
+      font-size: 14px;
+      color: var(--deep)
+    }
+
+    .note b {
+      color: var(--deep)
+    }
+
+    .warn {
+      border-left: 3px solid var(--amber);
+      background: var(--sand);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 18px 0;
+      font-size: 14px;
+      color: #78350F
+    }
+
+    .warn b {
+      color: #78350F
+    }
+
+    .tip {
+      border-left: 3px solid var(--mint);
+      background: #D1FAE5;
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 18px 0;
+      font-size: 14px;
+      color: #064E3B
+    }
+
+    /* Command reference table */
+    .cmdtable {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden
+    }
+
+    .cmdtable th {
+      text-align: left;
+      padding: 10px 14px;
+      background: var(--paper);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 600;
+      color: var(--slate);
+      border-bottom: 1px solid var(--border)
+    }
+
+    .cmdtable td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top
+    }
+
+    .cmdtable tr:last-child td {
+      border-bottom: 0
+    }
+
+    .cmdtable td:first-child {
+      white-space: nowrap
+    }
+
+    .cmdtable code {
+      background: var(--paper)
+    }
+
+    /* Flag list */
+    .flags {
+      margin: 14px 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden
+    }
+
+    .flag {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 24px;
+      font-size: 14px
+    }
+
+    .flag:last-child {
+      border-bottom: 0
+    }
+
+    .flag:nth-child(odd) {
+      background: var(--paper)
+    }
+
+    .flag .f {
+      font-family: var(--fm);
+      font-size: 13px;
+      color: var(--deep);
+      font-weight: 600
+    }
+
+    .flag .f small {
+      display: block;
+      color: var(--slate-soft);
+      font-weight: 400;
+      font-size: 11px;
+      margin-top: 2px
+    }
+
+    .flag .d {
+      color: var(--slate)
+    }
+
+    .flag .d b {
+      color: var(--obsidian)
+    }
+
+    /* Agent quickref cards */
+    .qgrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      margin: 14px 0
+    }
+
+    .qcard {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--white);
+      transition: all .15s
+    }
+
+    .qcard:hover {
+      border-color: var(--indigo);
+      transform: translateY(-1px)
+    }
+
+    .qcard .ic {
+      font-family: var(--fm);
+      font-size: 11px;
+      color: var(--slate-soft);
+      margin-bottom: 6px
+    }
+
+    .qcard .nm {
+      font-family: var(--fd);
+      font-weight: 700;
+      font-size: 16px;
+      margin-bottom: 2px
+    }
+
+    .qcard .ds {
+      font-size: 12.5px;
+      color: var(--slate);
+      line-height: 1.45
+    }
+
+    /* TOC */
+    .toc {
+      padding: 48px 24px;
+      height: calc(100vh - 56px);
+      position: sticky;
+      top: 56px;
+      overflow-y: auto;
+      font-size: 13px
+    }
+
+    .toc h5 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--slate);
+      margin-bottom: 10px
+    }
+
+    .toc a {
+      display: block;
+      padding: 4px 10px;
+      color: var(--slate);
+      border-left: 2px solid var(--border);
+      margin-bottom: 2px;
+      font-size: 12.5px
+    }
+
+    .toc a:hover {
+      color: var(--obsidian);
+      text-decoration: none;
+      border-left-color: var(--slate)
+    }
+
+    .toc a.active {
+      color: var(--indigo);
+      border-left-color: var(--indigo);
+      font-weight: 600
+    }
+
+    .toc a.sub {
+      padding-left: 22px;
+      font-size: 12px
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 24px;
+      font-size: 12px;
+      color: var(--slate-soft);
+      max-width: 1440px;
+      margin: 32px auto 0
+    }
+
+    .foot-grid {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px
+    }
+
+    .foot-grid a {
+      color: var(--slate)
+    }
+
+    /* Mobile search hidden */
+    @media(max-width:760px) {
+
+      .search,
+      .kbd-hint {
+        display: none
+      }
+
+      .topnav {
+        display: none
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="topbar">
+    <div class="logo">hira<span class="dot">.</span><small>git.hira.vn</small></div>
+    <nav class="topnav">
+      <a href="#install">Install</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#commands">Commands</a>
+      <a href="#agents">Agents</a>
+      <a href="#config">Config</a>
+      <a href="https://hira.vn">hira.vn ↗</a>
+    </nav>
+    <input class="search" placeholder="Search the docs…" />
+    <span class="kbd-hint">⌘K</span>
+  </header>
+
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-inner">
+        <div class="sb-group">
+          <h4>Getting Started</h4>
+          <a href="#overview" class="active">Overview</a>
+          <a href="#install">Installation</a>
+          <a href="#quickstart">Quickstart</a>
+          <a href="#auth">Authentication</a>
+          <a href="#upgrade">Upgrade & uninstall</a>
+        </div>
+        <div class="sb-group">
+          <h4>Core Commands</h4>
+          <a href="#cmd-init"><code style="background:transparent;border:0;padding:0">hira init</code></a>
+          <a href="#cmd-hire"><code style="background:transparent;border:0;padding:0">hira hire</code></a>
+          <a href="#cmd-assign"><code style="background:transparent;border:0;padding:0">hira assign</code></a>
+          <a href="#cmd-run"><code style="background:transparent;border:0;padding:0">hira run</code></a>
+          <a href="#cmd-status"><code style="background:transparent;border:0;padding:0">hira status</code></a>
+          <a href="#cmd-logs"><code style="background:transparent;border:0;padding:0">hira logs</code></a>
+        </div>
+        <div class="sb-group">
+          <h4>Agent Management</h4>
+          <a href="#agents">Agent marketplace</a>
+          <a href="#agent-list">List & search</a>
+          <a href="#agent-train">Train & customize</a>
+          <a href="#agent-fire">Fire an agent</a>
+        </div>
+        <div class="sb-group">
+          <h4>Workspace</h4>
+          <a href="#ws-switch">Switch workspace</a>
+          <a href="#ws-members">Manage members</a>
+          <a href="#ws-integrations">Integrations</a>
+        </div>
+        <div class="sb-group">
+          <h4>Advanced</h4>
+          <a href="#config">Config file</a>
+          <a href="#env">Environment vars</a>
+          <a href="#shell">Shell completion</a>
+          <a href="#ci">CI / automation</a>
+        </div>
+        <div class="sb-group">
+          <h4>Reference</h4>
+          <a href="#changelog">Changelog <span class="ver">v2.0.4</span></a>
+          <a href="#errors">Error codes</a>
+          <a href="https://github.com/hira/cli">GitHub repo ↗</a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main>
+      <div class="crumb">Docs <span class="sep">/</span> CLI Reference <span class="sep">/</span> Overview</div>
+
+      <section id="overview">
+        <h1>Hira CLI<span class="tag">v2.0.4</span></h1>
+        <p class="lede">
+          Tuyển, quản lý và làm việc cùng đội ngũ AI Agent — ngay từ terminal. Một câu lệnh để tuyển một agent mới, một
+          câu lệnh để giao việc, một câu lệnh để ship.
+        </p>
+        <div class="meta">
+          <span>⬢ <b>v2.0.4</b></span>
+          <span>released <b>Apr 18, 2026</b></span>
+          <span>macOS · Linux · Windows</span>
+          <span>License <b>MIT</b></span>
+          <span>⭐ <b>12.4k</b> on GitHub</span>
+        </div>
+
+        <p>
+          <code>hira</code> là official CLI cho <a href="https://hira.vn">Hira workspace</a>. Dùng để tương tác với AI
+          Agent của bạn từ terminal — không cần mở browser, không cần rời khỏi editor, pipe được vào mọi shell command
+          hay CI pipeline.
+        </p>
+      </section>
+
+      <hr />
+
+      <section id="install">
+        <h2>Installation</h2>
+        <p class="muted">Chọn platform của bạn. Tất cả các package đều được ký và auto-update.</p>
+
+        <div class="tabs" id="install-tabs">
+          <div class="tab-heads">
+            <button class="on" data-tab="brew">macOS · Homebrew</button>
+            <button data-tab="curl">Linux · curl</button>
+            <button data-tab="scoop">Windows · Scoop</button>
+            <button data-tab="npm">npm</button>
+            <button data-tab="docker">Docker</button>
+            <button data-tab="src">From source</button>
+          </div>
+
+          <div class="tab-body on" data-body="brew">
+            <pre><button class="copy">Copy</button># Install via Homebrew
+brew tap hira/tap
+brew install hira</pre>
+          </div>
+
+          <div class="tab-body" data-body="curl">
+            <pre><button class="copy">Copy</button># One-liner installer (macOS, Linux, WSL)
+curl -fsSL https://git.hira.vn/install.sh | bash</pre>
+          </div>
+
+          <div class="tab-body" data-body="scoop">
+            <pre><button class="copy">Copy</button># Windows via Scoop
+scoop bucket add hira https://github.com/hira/scoop-bucket
+scoop install hira</pre>
+          </div>
+
+          <div class="tab-body" data-body="npm">
+            <pre><button class="copy">Copy</button># Node.js — installs the `hira` binary globally
+npm install -g @hira/cli
+
+# or with pnpm / yarn
+pnpm add -g @hira/cli
+yarn global add @hira/cli</pre>
+          </div>
+
+          <div class="tab-body" data-body="docker">
+            <pre><button class="copy">Copy</button># Run without installing
+docker run --rm -it \
+  -v $HOME/.hira:/root/.hira \
+  ghcr.io/hira/cli:latest --help</pre>
+          </div>
+
+          <div class="tab-body" data-body="src">
+            <pre><button class="copy">Copy</button># Build from source — requires Go 1.22+
+git clone https://git.hira.vn/cli.git
+cd cli
+make build && sudo make install</pre>
+          </div>
+        </div>
+
+        <div class="note"><b>Verify the install:</b> chạy <code>hira --version</code>. Bạn sẽ thấy output như
+          <code>hira version 2.0.4 (darwin/arm64)</code>.</div>
+
+        <h3>What the installer does</h3>
+        <ol>
+          <li>Tải binary cho kiến trúc của bạn từ <code>dl.hira.vn</code> (TLS + SHA-256 verified)</li>
+          <li>Cài vào <code>/usr/local/bin/hira</code> (hoặc <code>~/.hira/bin</code> nếu không có sudo)</li>
+          <li>Tạo thư mục config tại <code>~/.hira/</code></li>
+          <li>Đăng ký shell completion cho bash, zsh, fish</li>
+        </ol>
+      </section>
+
+      <hr />
+
+      <section id="quickstart">
+        <h2>Quickstart</h2>
+        <p>Từ zero tới AI Agent đầu tiên hoàn thành task — trong vòng 60 giây.</p>
+
+        <div class="term">
+          <div class="term-head"><i></i><i></i><i></i><span class="term-title">~/projects/acme · zsh</span></div>
+          <pre><span class="c-m"># 1. Đăng nhập Hira workspace</span>
+<span class="c-p">$</span> <span class="c-c">hira login</span>
+<span class="c-f">✓</span> Opening browser to https://auth.hira.vn/cli…
+<span class="c-f">✓</span> Logged in as <span class="c-a"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="74191d1a1c34151719115a021a">[email&#160;protected]</a></span>
+<span class="c-f">✓</span> Default workspace: <span class="c-s">acme-growth</span>
+
+<span class="c-m"># 2. Tuyển agent đầu tiên từ marketplace</span>
+<span class="c-p">$</span> <span class="c-c">hira hire</span> <span class="c-s">writer</span> <span class="c-f">--name</span> <span class="c-s">Anna</span>
+<span class="c-m">  Browsing 12 writer agents…</span>
+<span class="c-f">✓</span> Hired <span class="c-a">Anna</span> · Content Writer · $0.40/task
+<span class="c-f">✓</span> Added to workspace acme-growth · ready in 4s
+
+<span class="c-m"># 3. Giao việc bằng ngôn ngữ tự nhiên</span>
+<span class="c-p">$</span> <span class="c-c">hira assign</span> <span class="c-s">@Anna</span> <span class="c-s">"Viết blog 1200 từ về Q2 launch, tone casual"</span>
+<span class="c-f">✓</span> Task HIRA-847 created · assigned to Anna
+<span class="c-m">  Anna is thinking… (est. 3 min)</span>
+
+<span class="c-m"># 4. Stream progress trực tiếp trong terminal</span>
+<span class="c-p">$</span> <span class="c-c">hira logs</span> <span class="c-s">HIRA-847</span> <span class="c-f">--follow</span>
+<span class="c-m">[14:02:11]</span> Researching competitor launches (4 sources)…
+<span class="c-m">[14:02:48]</span> Drafting outline · <span class="c-s">6 sections</span>
+<span class="c-m">[14:03:22]</span> Writing body · 680/1200 words
+<span class="c-m">[14:04:01]</span> <span class="c-f">✓</span> Done · <span class="c-a">SEO score 92/100</span> · ready for review</pre>
+        </div>
+
+        <div class="tip"><b>That's it.</b> Mở dashboard với <code>hira open</code> để review bản thảo, hoặc chạy
+          <code>hira publish HIRA-847</code> để publish thẳng qua tích hợp CMS.</div>
+      </section>
+
+      <hr />
+
+      <section id="commands">
+        <h2>Core commands</h2>
+        <p>Toàn bộ CLI xoay quanh 8 command chính. Mỗi command đều có <code>--help</code> in kèm examples.</p>
+
+        <table class="cmdtable">
+          <thead>
+            <tr>
+              <th>Command</th>
+              <th>Mô tả</th>
+              <th>Alias</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>hira init</code></td>
+              <td>Khởi tạo workspace mới hoặc liên kết thư mục hiện tại</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><code>hira login</code></td>
+              <td>Đăng nhập via browser OAuth hoặc API token</td>
+              <td><code>auth</code></td>
+            </tr>
+            <tr>
+              <td><code>hira hire &lt;role&gt;</code></td>
+              <td>Tuyển một AI Agent từ marketplace</td>
+              <td><code>recruit</code></td>
+            </tr>
+            <tr>
+              <td><code>hira fire &lt;agent&gt;</code></td>
+              <td>Loại agent khỏi workspace</td>
+              <td><code>rm</code></td>
+            </tr>
+            <tr>
+              <td><code>hira assign &lt;agent&gt; &lt;task&gt;</code></td>
+              <td>Giao task cho agent</td>
+              <td><code>a</code></td>
+            </tr>
+            <tr>
+              <td><code>hira run &lt;playbook&gt;</code></td>
+              <td>Chạy một playbook (multi-agent workflow)</td>
+              <td>—</td>
+            </tr>
+            <tr>
+              <td><code>hira status</code></td>
+              <td>Xem trạng thái workspace, agent, task đang chạy</td>
+              <td><code>st</code>, <code>ps</code></td>
+            </tr>
+            <tr>
+              <td><code>hira logs &lt;task&gt;</code></td>
+              <td>Xem/stream log của task</td>
+              <td><code>tail</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="cmd-hire">
+        <h3>hira hire</h3>
+        <p>Tuyển một agent mới từ marketplace và thêm vào workspace hiện tại.</p>
+
+        <div class="term">
+          <div class="term-head"><i></i><i></i><i></i><span class="term-title">hira hire --help</span></div>
+          <pre><span class="c-p">$</span> <span class="c-c">hira hire --help</span>
+
+<span class="c-f">USAGE</span>
+  hira hire &lt;role&gt; [flags]
+
+<span class="c-f">ARGS</span>
+  &lt;role&gt;    Role slug from marketplace (writer, engineer, analyst, …)
+
+<span class="c-f">FLAGS</span>
+  <span class="c-a">-n, --name &lt;string&gt;</span>        Personal name for this agent
+  <span class="c-a">-w, --workspace &lt;id&gt;</span>       Target workspace (default: current)
+  <span class="c-a">-s, --skills &lt;list&gt;</span>        Comma-separated skill tags
+  <span class="c-a">-m, --model &lt;name&gt;</span>         Override underlying model
+  <span class="c-a">    --dry-run</span>              Print cost estimate, don't hire
+  <span class="c-a">    --json</span>                  Output JSON
+
+<span class="c-f">EXAMPLES</span>
+  <span class="c-m"># Hire a writer named Anna</span>
+  hira hire writer --name Anna
+
+  <span class="c-m"># Hire an engineer with specific skills</span>
+  hira hire engineer -n Devin --skills typescript,go,sql
+
+  <span class="c-m"># Check what it would cost first</span>
+  hira hire analyst --dry-run</pre>
+        </div>
+
+        <h3 id="cmd-assign">hira assign</h3>
+        <p>Giao một task mới cho agent. Mô tả bằng ngôn ngữ tự nhiên — agent sẽ phân tích, hỏi làm rõ (nếu cần) và bắt
+          đầu thực thi.</p>
+
+        <div class="flags">
+          <div class="flag">
+            <div class="f">@agent<small>positional</small></div>
+            <div class="d">Tên agent có prefix <code>@</code>. Dùng <code>@all</code> để broadcast.</div>
+          </div>
+          <div class="flag">
+            <div class="f">task<small>positional</small></div>
+            <div class="d">Mô tả task. Có thể multiline với <code>"""…"""</code>.</div>
+          </div>
+          <div class="flag">
+            <div class="f">--priority<small>p1 | p2 | p3</small></div>
+            <div class="d">Độ ưu tiên. Mặc định <code>p2</code>.</div>
+          </div>
+          <div class="flag">
+            <div class="f">--due<small>duration</small></div>
+            <div class="d">Deadline mềm, vd. <code>--due 2h</code>, <code>--due tomorrow</code>.</div>
+          </div>
+          <div class="flag">
+            <div class="f">--attach<small>path</small></div>
+            <div class="d">Đính kèm file (doc, image, csv). Có thể lặp lại.</div>
+          </div>
+          <div class="flag">
+            <div class="f">--watch<small>flag</small></div>
+            <div class="d">Stream logs ngay sau khi assign. Tương đương assign + logs -f.</div>
+          </div>
+        </div>
+      </section>
+
+      <hr />
+
+      <section id="agents">
+        <h2>Agent marketplace</h2>
+        <p>40+ agent được huấn luyện cho từng vai trò cụ thể. Xem toàn bộ qua <code>hira hire --list</code>, hoặc tìm
+          theo skill với <code>hira hire --search</code>.</p>
+
+        <div class="qgrid">
+          <div class="qcard">
+            <div class="ic">@anna</div>
+            <div class="nm">Writer</div>
+            <div class="ds">Blog, email, SEO, social. VN+EN.</div>
+          </div>
+          <div class="qcard">
+            <div class="ic">@devin</div>
+            <div class="nm">Engineer</div>
+            <div class="ds">TS, Go, Python, SQL. PRs + tests.</div>
+          </div>
+          <div class="qcard">
+            <div class="ic">@rena</div>
+            <div class="nm">Analyst</div>
+            <div class="ds">SQL, dashboards, forecasts.</div>
+          </div>
+          <div class="qcard">
+            <div class="ic">@sora</div>
+            <div class="nm">Support</div>
+            <div class="ds">Chat, email, 24/7 tickets.</div>
+          </div>
+          <div class="qcard">
+            <div class="ic">@leo</div>
+            <div class="nm">Designer</div>
+            <div class="ds">UI specs, Figma ops, copy.</div>
+          </div>
+          <div class="qcard">
+            <div class="ic">@kai</div>
+            <div class="nm">PM</div>
+            <div class="ds">Tickets, roadmap, retros.</div>
+          </div>
+        </div>
+
+        <div class="warn"><b>Fair-use note:</b> Mỗi agent chạy theo per-task pricing. Xem cost trước khi commit bằng
+          flag <code>--dry-run</code>.</div>
+      </section>
+
+      <hr />
+
+      <section id="config">
+        <h2>Config file</h2>
+        <p>Hira lưu config tại <code>~/.hira/config.yaml</code>. Có thể override bằng <code>HIRA_CONFIG</code> env var
+          hoặc flag <code>--config</code>.</p>
+
+        <div class="term">
+          <div class="term-head"><i></i><i></i><i></i><span class="term-title">~/.hira/config.yaml</span></div>
+          <pre><span class="c-m"># Hira CLI configuration</span>
+<span class="c-a">version</span>: 2
+
+<span class="c-a">default_workspace</span>: <span class="c-s">acme-growth</span>
+
+<span class="c-a">workspaces</span>:
+  <span class="c-a">acme-growth</span>:
+    <span class="c-a">endpoint</span>: <span class="c-s">https://api.hira.vn</span>
+    <span class="c-a">token</span>: <span class="c-s">${HIRA_TOKEN}</span>
+    <span class="c-a">default_priority</span>: p2
+
+<span class="c-a">output</span>:
+  <span class="c-a">format</span>: pretty     <span class="c-m"># pretty | json | yaml</span>
+  <span class="c-a">color</span>: auto        <span class="c-m"># auto | always | never</span>
+
+<span class="c-a">agents</span>:
+  <span class="c-a">autosave_logs</span>: true
+  <span class="c-a">max_parallel</span>: 5</pre>
+        </div>
+
+        <h3 id="env">Environment variables</h3>
+        <div class="flags">
+          <div class="flag">
+            <div class="f">HIRA_TOKEN</div>
+            <div class="d">API token. Override credentials trong config.</div>
+          </div>
+          <div class="flag">
+            <div class="f">HIRA_WORKSPACE</div>
+            <div class="d">Override workspace mặc định cho session.</div>
+          </div>
+          <div class="flag">
+            <div class="f">HIRA_CONFIG</div>
+            <div class="d">Đường dẫn tới file config tuỳ chỉnh.</div>
+          </div>
+          <div class="flag">
+            <div class="f">NO_COLOR</div>
+            <div class="d">Tắt ANSI colors (standard).</div>
+          </div>
+          <div class="flag">
+            <div class="f">HIRA_DEBUG</div>
+            <div class="d">Bật verbose debug logging.</div>
+          </div>
+        </div>
+      </section>
+
+      <hr />
+
+      <section id="shell">
+        <h2>Shell completion</h2>
+        <p>CLI hỗ trợ tab-completion cho tên agent, task ID, workspace, flag — cho <b>bash</b>, <b>zsh</b>, <b>fish</b>,
+          và PowerShell.</p>
+
+        <div class="tabs" id="shell-tabs">
+          <div class="tab-heads">
+            <button class="on" data-tab="zsh">zsh</button>
+            <button data-tab="bash">bash</button>
+            <button data-tab="fish">fish</button>
+            <button data-tab="ps">PowerShell</button>
+          </div>
+          <div class="tab-body on" data-body="zsh">
+            <pre><button class="copy">Copy</button># Add to ~/.zshrc
+source &lt;(hira completion zsh)
+compdef _hira hira</pre>
+          </div>
+          <div class="tab-body" data-body="bash">
+            <pre><button class="copy">Copy</button># Add to ~/.bashrc
+source &lt;(hira completion bash)</pre>
+          </div>
+          <div class="tab-body" data-body="fish">
+            <pre><button class="copy">Copy</button>hira completion fish | source</pre>
+          </div>
+          <div class="tab-body" data-body="ps">
+            <pre><button class="copy">Copy</button>hira completion powershell | Out-String | Invoke-Expression</pre>
+          </div>
+        </div>
+      </section>
+
+      <hr />
+
+      <section id="ci">
+        <h2>CI / automation</h2>
+        <p>Dùng Hira CLI trong GitHub Actions, GitLab CI, hay bất kỳ pipeline nào. Token được inject qua env var.</p>
+
+        <div class="term">
+          <div class="term-head"><i></i><i></i><i></i><span
+              class="term-title">.github/workflows/release-notes.yml</span></div>
+          <pre><span class="c-a">name</span>: Auto release notes
+<span class="c-a">on</span>:
+  <span class="c-a">release</span>: { <span class="c-a">types</span>: [published] }
+
+<span class="c-a">jobs</span>:
+  <span class="c-a">notes</span>:
+    <span class="c-a">runs-on</span>: ubuntu-latest
+    <span class="c-a">steps</span>:
+      - <span class="c-a">uses</span>: actions/checkout@v4
+      - <span class="c-a">uses</span>: hira/setup-cli@v1
+      - <span class="c-a">run</span>: |
+          hira assign @anna \
+            "<span class="c-s">Viết release notes cho ${{ github.event.release.tag_name }}</span>" \
+            --attach CHANGELOG.md --priority p1
+        <span class="c-a">env</span>:
+          <span class="c-a">HIRA_TOKEN</span>: ${{ secrets.HIRA_TOKEN }}</pre>
+        </div>
+      </section>
+
+      <hr />
+
+      <section id="errors">
+        <h2>Common errors</h2>
+        <div class="flags">
+          <div class="flag">
+            <div class="f">E-AUTH-01</div>
+            <div class="d"><b>Token expired.</b> Chạy <code>hira login</code> để làm mới.</div>
+          </div>
+          <div class="flag">
+            <div class="f">E-HIRE-14</div>
+            <div class="d"><b>Agent seat limit reached.</b> Upgrade gói, hoặc fire một agent không dùng.</div>
+          </div>
+          <div class="flag">
+            <div class="f">E-ASSIGN-22</div>
+            <div class="d"><b>Agent offline.</b> Chạy <code>hira status</code> để kiểm tra, hoặc reassign cho agent
+              khác.</div>
+          </div>
+          <div class="flag">
+            <div class="f">E-NET-05</div>
+            <div class="d"><b>Rate limited.</b> Thử lại sau <code>Retry-After</code> giây trong header.</div>
+          </div>
+        </div>
+      </section>
+
+      <hr />
+
+      <section id="changelog" style="margin-bottom:32px">
+        <h2>Changelog</h2>
+        <p class="muted">Xem đầy đủ tại <a href="https://git.hira.vn/cli/releases">git.hira.vn/cli/releases</a>.</p>
+        <ul>
+          <li><code>v2.0.4</code> · <b>Apr 18, 2026</b> · Fix race condition trong <code>hira logs -f</code>, bổ sung
+            <code>--json</code> cho mọi command.</li>
+          <li><code>v2.0.0</code> · <b>Mar 04, 2026</b> · Rewrite lõi sang Go · native watch mode · playbook YAML
+            support.</li>
+          <li><code>v1.8.0</code> · <b>Jan 22, 2026</b> · Agent marketplace trong CLI · shell completion cho fish.</li>
+        </ul>
+      </section>
+    </main>
+
+    <!-- TOC -->
+    <aside class="toc">
+      <h5>On this page</h5>
+      <a href="#overview" class="active">Overview</a>
+      <a href="#install">Installation</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#commands">Core commands</a>
+      <a href="#cmd-hire" class="sub">hire</a>
+      <a href="#cmd-assign" class="sub">assign</a>
+      <a href="#agents">Agent marketplace</a>
+      <a href="#config">Config file</a>
+      <a href="#env" class="sub">Environment</a>
+      <a href="#shell">Shell completion</a>
+      <a href="#ci">CI / automation</a>
+      <a href="#errors">Common errors</a>
+      <a href="#changelog">Changelog</a>
+    </aside>
+  </div>
+
+  <footer>
+    <div class="foot-grid">
+      <div>© 2026 Hira Inc · Made with ♥ in Saigon</div>
+      <div><a href="#">Docs</a> · <a href="#">Changelog</a> · <a href="#">Status</a> · <a href="#">GitHub ↗</a></div>
+    </div>
+  </footer>
+
+  <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+  <script>
+    // Tab switching
+    document.querySelectorAll('.tabs').forEach(tabs => {
+      tabs.querySelectorAll('.tab-heads button').forEach(b => {
+        b.addEventListener('click', () => {
+          const t = b.dataset.tab;
+          tabs.querySelectorAll('.tab-heads button').forEach(x => x.classList.toggle('on', x === b));
+          tabs.querySelectorAll('.tab-body').forEach(x => x.classList.toggle('on', x.dataset.body === t));
+        });
+      });
+    });
+
+    // Copy buttons
+    document.querySelectorAll('.copy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pre = btn.parentElement;
+        const txt = pre.innerText.replace(/^Copy\n?/, '').trim();
+        navigator.clipboard.writeText(txt).then(() => {
+          btn.textContent = 'Copied';
+          btn.classList.add('ok');
+          setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1400);
+        });
+      });
+    });
+
+    // TOC scroll-spy
+    const tocLinks = document.querySelectorAll('.toc a');
+    const sections = [...tocLinks].map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+    const setActive = () => {
+      const y = window.scrollY + 120;
+      let cur = sections[0];
+      for (const s of sections) if (s.offsetTop <= y) cur = s;
+      tocLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur.id));
+    };
+    window.addEventListener('scroll', setActive, { passive: true });
+    setActive();
+  </script>
+</body>
+
+</html>
