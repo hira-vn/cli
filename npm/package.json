@@ -1,0 +1,31 @@
+{
+  "name": "@hira-vn/cli",
+  "version": "0.0.0-placeholder",
+  "description": "Hira CLI — local agent runtime and management tool",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hira-vn/cli"
+  },
+  "homepage": "https://hira.vn",
+  "bugs": {
+    "url": "https://github.com/hira-vn/cli/issues"
+  },
+  "keywords": ["hira", "cli", "agent", "daemon"],
+  "engines": {
+    "node": ">=16"
+  },
+  "bin": {
+    "hira": "./bin/run.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "files": [
+    "bin/run.js",
+    "scripts/postinstall.js"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
