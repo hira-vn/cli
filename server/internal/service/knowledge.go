@@ -188,6 +188,7 @@ func (s *KnowledgeService) runIndex(ctx context.Context, doc knowledge.Doc) erro
 
 	// 6. Upsert entities, compute their embeddings.
 	entityIDs := make(map[string]string) // (kind|name) -> uuid
+	var upsertedEntityIDs []string        // for stale-entity cleanup (Phase 2)
 	entityInputs := make([]string, 0, len(ex.Entities))
 	for _, e := range ex.Entities {
 		entityInputs = append(entityInputs, string(e.Kind)+": "+e.Name+"\n"+e.Description)
@@ -199,12 +200,20 @@ func (s *KnowledgeService) runIndex(ctx context.Context, doc knowledge.Doc) erro
 		if i < len(entEmbeds) {
 			emb = entEmbeds[i]
 		}
-		id, upErr := s.Store.UpsertEntity(ctx, doc.WorkspaceID, e, emb, "extracted")
+		id, upErr := s.Store.UpsertEntity(ctx, doc.WorkspaceID, e, emb, "extracted", doc.ID)
 		if upErr != nil {
 			slog.Warn("knowledge: upsert entity failed", "name", e.Name, "error", upErr)
 			continue
 		}
 		entityIDs[entityKey(e.Kind, e.Name)] = id
+		upsertedEntityIDs = append(upsertedEntityIDs, id)
+	}
+
+	// Remove entities from the previous version of this doc that weren't
+	// re-extracted. Only touches rows with source_doc_id = doc.ID so
+	// shared entities (conflicted into a different doc's row) are safe.
+	if delErr := s.Store.DeleteStaleDocEntities(ctx, doc.ID, upsertedEntityIDs); delErr != nil {
+		slog.Warn("knowledge: stale entity cleanup failed", "doc_id", doc.ID, "error", delErr)
 	}
 
 	// 7. Upsert relations by resolving names to IDs.
@@ -317,6 +326,23 @@ func (s *KnowledgeService) UpdateEntity(ctx context.Context, workspaceID, entity
 // EntityGraph returns a 1-hop neighbor list for an entity.
 func (s *KnowledgeService) EntityGraph(ctx context.Context, workspaceID, entityID string) ([]knowledge.RelatedEntity, error) {
 	return s.Store.EntityNeighbors(ctx, workspaceID, entityID)
+}
+
+// DeleteEntity removes a single entity (workspace-scoped).
+func (s *KnowledgeService) DeleteEntity(ctx context.Context, workspaceID, entityID string) error {
+	if err := s.Store.DeleteEntity(ctx, workspaceID, entityID); err != nil {
+		return err
+	}
+	s.publish(protocol.EventKnowledgeEntityDeleted, workspaceID, map[string]any{
+		"id":           entityID,
+		"workspace_id": workspaceID,
+	})
+	return nil
+}
+
+// ListOrphanEntities returns extracted entities that have no relation edges.
+func (s *KnowledgeService) ListOrphanEntities(ctx context.Context, workspaceID string) ([]knowledge.Entity, error) {
+	return s.Store.ListOrphanEntities(ctx, workspaceID)
 }
 
 // GraphResult bundles everything needed to render the workspace graph:

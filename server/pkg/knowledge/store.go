@@ -262,7 +262,10 @@ func (s *Store) GetChunksForDoc(ctx context.Context, docID string) ([]Chunk, err
 // --- Entities ---
 
 // UpsertEntity creates or updates an entity, merging aliases with any existing set.
-func (s *Store) UpsertEntity(ctx context.Context, workspaceID string, e ExtractedEntity, embedding []float32, source string) (string, error) {
+// sourceDocID, when non-empty, is stored on INSERT so we can prune stale entities
+// on reindex. It is intentionally NOT updated on conflict: if two docs produce the
+// same (workspace, kind, name) entity the first writer's doc-link is preserved.
+func (s *Store) UpsertEntity(ctx context.Context, workspaceID string, e ExtractedEntity, embedding []float32, source, sourceDocID string) (string, error) {
 	// Normalize nil maps/slices so pgx binds '{}' / '[]' instead of SQL NULL
 	// (both columns are NOT NULL DEFAULT '{}').
 	if e.Attributes == nil {
@@ -279,9 +282,13 @@ func (s *Store) UpsertEntity(ctx context.Context, workspaceID string, e Extracte
 	if embedding != nil {
 		emb = vectorLiteral(embedding)
 	}
+	var docIDArg any
+	if sourceDocID != "" {
+		docIDArg = sourceDocID
+	}
 	row := s.pool.QueryRow(ctx, `INSERT INTO knowledge_entity
-		(workspace_id, kind, name, aliases, description, attributes, embedding, source)
-		VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::vector, $8)
+		(workspace_id, kind, name, aliases, description, attributes, embedding, source, source_doc_id)
+		VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::vector, $8, $9)
 		ON CONFLICT (workspace_id, kind, name) DO UPDATE SET
 		  aliases     = ARRAY(SELECT DISTINCT unnest(knowledge_entity.aliases || EXCLUDED.aliases)),
 		  description = CASE WHEN EXCLUDED.description <> '' THEN EXCLUDED.description ELSE knowledge_entity.description END,
@@ -289,7 +296,7 @@ func (s *Store) UpsertEntity(ctx context.Context, workspaceID string, e Extracte
 		  embedding   = COALESCE(EXCLUDED.embedding, knowledge_entity.embedding),
 		  updated_at  = now()
 		RETURNING id`,
-		workspaceID, string(e.Kind), e.Name, e.Aliases, e.Description, attrs, emb, source)
+		workspaceID, string(e.Kind), e.Name, e.Aliases, e.Description, attrs, emb, source, docIDArg)
 	var id string
 	if err := row.Scan(&id); err != nil {
 		return "", err
@@ -856,6 +863,70 @@ func scanDoc(r rowScanner) (Doc, error) {
 		_ = json.Unmarshal(statsBytes, &d.Stats)
 	}
 	return d, nil
+}
+
+// DeleteEntity removes a single entity by ID (workspace-scoped).
+func (s *Store) DeleteEntity(ctx context.Context, workspaceID, entityID string) error {
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM knowledge_entity WHERE id = $1 AND workspace_id = $2`,
+		entityID, workspaceID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListOrphanEntities returns extracted entities that have no relation edges —
+// neither as source nor as target. These are candidates for cleanup after a
+// doc is updated or replaced.
+func (s *Store) ListOrphanEntities(ctx context.Context, workspaceID string) ([]Entity, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT e.id, e.workspace_id, e.kind, e.name, e.aliases, e.description,
+		       e.attributes, e.source, e.created_at, e.updated_at
+		FROM knowledge_entity e
+		LEFT JOIN knowledge_relation r1 ON e.id = r1.source_id
+		LEFT JOIN knowledge_relation r2 ON e.id = r2.target_id
+		WHERE e.workspace_id = $1
+		  AND r1.source_id IS NULL
+		  AND r2.target_id IS NULL
+		ORDER BY e.created_at`, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Entity
+	for rows.Next() {
+		e, err := scanEntity(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// DeleteStaleDocEntities removes extracted entities that were previously linked
+// to docID via source_doc_id but are not in keepIDs. Called after reindex to
+// prune entities from the previous version of a doc. Entities with
+// source_doc_id = NULL (legacy) or source = 'manual' are never touched.
+func (s *Store) DeleteStaleDocEntities(ctx context.Context, docID string, keepIDs []string) error {
+	if len(keepIDs) == 0 {
+		// Delete all extracted entities for this doc (body became empty or extraction failed).
+		_, err := s.pool.Exec(ctx,
+			`DELETE FROM knowledge_entity WHERE source_doc_id = $1 AND source = 'extracted'`,
+			docID)
+		return err
+	}
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM knowledge_entity
+		 WHERE source_doc_id = $1
+		   AND source = 'extracted'
+		   AND id != ALL($2::uuid[])`,
+		docID, keepIDs)
+	return err
 }
 
 func scanEntity(r rowScanner) (Entity, error) {

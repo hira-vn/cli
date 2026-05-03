@@ -167,10 +167,24 @@ func (h *Handler) ReindexKnowledgeDoc(w http.ResponseWriter, r *http.Request) {
 // --- Entity endpoints ---
 
 // ListKnowledgeEntities returns entities, optionally filtered by ?kind=.
+// Pass ?orphan=true to return only entities with no relation edges.
 func (h *Handler) ListKnowledgeEntities(w http.ResponseWriter, r *http.Request) {
 	workspaceID := ctxWorkspaceID(r.Context())
-	kind := knowledge.EntityKind(r.URL.Query().Get("kind"))
 
+	if r.URL.Query().Get("orphan") == "true" {
+		entities, err := h.KnowledgeService.ListOrphanEntities(r.Context(), workspaceID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if entities == nil {
+			entities = []knowledge.Entity{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"entities": entities})
+		return
+	}
+
+	kind := knowledge.EntityKind(r.URL.Query().Get("kind"))
 	entities, err := h.KnowledgeService.ListEntities(r.Context(), workspaceID, kind)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -180,6 +194,22 @@ func (h *Handler) ListKnowledgeEntities(w http.ResponseWriter, r *http.Request) 
 		entities = []knowledge.Entity{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"entities": entities})
+}
+
+// DeleteKnowledgeEntity removes an entity by ID (workspace-scoped).
+func (h *Handler) DeleteKnowledgeEntity(w http.ResponseWriter, r *http.Request) {
+	workspaceID := ctxWorkspaceID(r.Context())
+	entityID := chi.URLParam(r, "id")
+
+	if err := h.KnowledgeService.DeleteEntity(r.Context(), workspaceID, entityID); err != nil {
+		if errors.Is(err, knowledge.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "entity not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // GetKnowledgeEntity returns a single entity.
