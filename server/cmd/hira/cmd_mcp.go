@@ -278,6 +278,36 @@ func knowledgeToolSchemas() []map[string]any {
 				"required": []string{"id"},
 			},
 		},
+		{
+			"name":        "delete_entity",
+			"description": "Permanently delete a knowledge entity by UUID. Cascades to its relation edges and chunk mentions. Use list_orphan_entities to identify candidates first.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"id": map[string]any{"type": "string", "description": "Entity UUID."},
+				},
+				"required": []string{"id"},
+			},
+		},
+		{
+			"name":        "delete_doc",
+			"description": "Permanently delete a knowledge document and all its indexed chunks. Use when a doc is obsolete or replaced.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"id": map[string]any{"type": "string", "description": "Document UUID."},
+				},
+				"required": []string{"id"},
+			},
+		},
+		{
+			"name":        "list_orphan_entities",
+			"description": "List extracted entities that have no relation edges (neither as source nor target). These are candidates for cleanup — typically remnants from outdated or replaced docs.",
+			"inputSchema": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
 	}
 }
 
@@ -309,6 +339,12 @@ func (s *mcpKnowledgeServer) dispatchTool(ctx context.Context, raw json.RawMessa
 		return s.toolCreateDoc(ctx, p.Arguments)
 	case "update_doc":
 		return s.toolUpdateDoc(ctx, p.Arguments)
+	case "delete_entity":
+		return s.toolDeleteEntity(ctx, p.Arguments)
+	case "delete_doc":
+		return s.toolDeleteDoc(ctx, p.Arguments)
+	case "list_orphan_entities":
+		return s.toolListOrphanEntities(ctx, p.Arguments)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", p.Name)
 	}
@@ -482,6 +518,38 @@ func (s *mcpKnowledgeServer) toolUpdateDoc(ctx context.Context, args map[string]
 	var raw json.RawMessage
 	if err := s.api.PutJSON(ctx, "/api/knowledge/docs/"+id, payload, &raw); err != nil {
 		return nil, fmt.Errorf("update doc api: %w", err)
+	}
+	return textContent(string(raw)), nil
+}
+
+func (s *mcpKnowledgeServer) toolDeleteEntity(ctx context.Context, args map[string]any) (map[string]any, error) {
+	id, _ := args["id"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, fmt.Errorf("id must be a non-empty string")
+	}
+	if err := s.api.DeleteJSON(ctx, "/api/knowledge/entities/"+id); err != nil {
+		return nil, fmt.Errorf("delete entity api: %w", err)
+	}
+	return textContent(`{"deleted":true}`), nil
+}
+
+func (s *mcpKnowledgeServer) toolDeleteDoc(ctx context.Context, args map[string]any) (map[string]any, error) {
+	id, _ := args["id"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, fmt.Errorf("id must be a non-empty string")
+	}
+	if err := s.api.DeleteJSON(ctx, "/api/knowledge/docs/"+id); err != nil {
+		return nil, fmt.Errorf("delete doc api: %w", err)
+	}
+	return textContent(`{"deleted":true}`), nil
+}
+
+func (s *mcpKnowledgeServer) toolListOrphanEntities(ctx context.Context, _ map[string]any) (map[string]any, error) {
+	var raw json.RawMessage
+	if err := s.api.GetJSON(ctx, "/api/knowledge/entities?orphan=true", &raw); err != nil {
+		return nil, fmt.Errorf("list orphan entities api: %w", err)
 	}
 	return textContent(string(raw)), nil
 }

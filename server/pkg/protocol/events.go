@@ -98,4 +98,5 @@ const (
 	EventKnowledgeDocFailed     = "knowledge:doc_failed"
 	EventKnowledgeEntityUpdated = "knowledge:entity_updated"
 	EventKnowledgeEntityMerged  = "knowledge:entity_merged"
+	EventKnowledgeEntityDeleted = "knowledge:entity_deleted"
 )
