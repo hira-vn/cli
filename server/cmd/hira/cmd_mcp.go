@@ -245,6 +245,39 @@ func knowledgeToolSchemas() []map[string]any {
 				"required": []string{"id_or_slug"},
 			},
 		},
+		{
+			"name":        "create_doc",
+			"description": "Create a new knowledge document in the workspace. Returns the created doc with its UUID.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title":    map[string]any{"type": "string", "description": "Document title."},
+					"body":     map[string]any{"type": "string", "description": "Document body in markdown."},
+					"slug":     map[string]any{"type": "string", "description": "URL-friendly slug (e.g. 'refund-policy'). Auto-generated from title if omitted."},
+					"category": map[string]any{"type": "string", "description": "Document category."},
+					"tags":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "List of tags."},
+					"status":   map[string]any{"type": "string", "description": "draft or published (default: draft)."},
+				},
+				"required": []string{"title", "body"},
+			},
+		},
+		{
+			"name":        "update_doc",
+			"description": "Update an existing knowledge document. Only provided fields are changed.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"id":       map[string]any{"type": "string", "description": "Document UUID."},
+					"title":    map[string]any{"type": "string", "description": "New title."},
+					"body":     map[string]any{"type": "string", "description": "New body (markdown)."},
+					"slug":     map[string]any{"type": "string", "description": "New slug."},
+					"category": map[string]any{"type": "string", "description": "New category."},
+					"tags":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "New tags (replaces existing)."},
+					"status":   map[string]any{"type": "string", "description": "New status: draft or published."},
+				},
+				"required": []string{"id"},
+			},
+		},
 	}
 }
 
@@ -272,6 +305,10 @@ func (s *mcpKnowledgeServer) dispatchTool(ctx context.Context, raw json.RawMessa
 		return s.toolGetEntity(ctx, p.Arguments)
 	case "get_doc":
 		return s.toolGetDoc(ctx, p.Arguments)
+	case "create_doc":
+		return s.toolCreateDoc(ctx, p.Arguments)
+	case "update_doc":
+		return s.toolUpdateDoc(ctx, p.Arguments)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", p.Name)
 	}
@@ -386,6 +423,67 @@ func (s *mcpKnowledgeServer) toolGetDoc(ctx context.Context, args map[string]any
 		}
 	}
 	return nil, fmt.Errorf("no doc found for id_or_slug %q", idOrSlug)
+}
+
+func (s *mcpKnowledgeServer) toolCreateDoc(ctx context.Context, args map[string]any) (map[string]any, error) {
+	title, _ := args["title"].(string)
+	if strings.TrimSpace(title) == "" {
+		return nil, fmt.Errorf("title must be a non-empty string")
+	}
+	body, _ := args["body"].(string)
+	if strings.TrimSpace(body) == "" {
+		return nil, fmt.Errorf("body must be a non-empty string")
+	}
+	payload := map[string]any{"title": title, "body": body}
+	if v, ok := args["slug"].(string); ok && v != "" {
+		payload["slug"] = v
+	}
+	if v, ok := args["category"].(string); ok && v != "" {
+		payload["category"] = v
+	}
+	if v, ok := args["tags"]; ok {
+		payload["tags"] = v
+	}
+	if v, ok := args["status"].(string); ok && v != "" {
+		payload["status"] = v
+	}
+	var raw json.RawMessage
+	if err := s.api.PostJSON(ctx, "/api/knowledge/docs", payload, &raw); err != nil {
+		return nil, fmt.Errorf("create doc api: %w", err)
+	}
+	return textContent(string(raw)), nil
+}
+
+func (s *mcpKnowledgeServer) toolUpdateDoc(ctx context.Context, args map[string]any) (map[string]any, error) {
+	id, _ := args["id"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, fmt.Errorf("id must be a non-empty string")
+	}
+	payload := map[string]any{}
+	if v, ok := args["title"].(string); ok {
+		payload["title"] = v
+	}
+	if v, ok := args["body"].(string); ok {
+		payload["body"] = v
+	}
+	if v, ok := args["slug"].(string); ok {
+		payload["slug"] = v
+	}
+	if v, ok := args["category"].(string); ok {
+		payload["category"] = v
+	}
+	if v, ok := args["tags"]; ok {
+		payload["tags"] = v
+	}
+	if v, ok := args["status"].(string); ok {
+		payload["status"] = v
+	}
+	var raw json.RawMessage
+	if err := s.api.PutJSON(ctx, "/api/knowledge/docs/"+id, payload, &raw); err != nil {
+		return nil, fmt.Errorf("update doc api: %w", err)
+	}
+	return textContent(string(raw)), nil
 }
 
 // --- helpers ---
