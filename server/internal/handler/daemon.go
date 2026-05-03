@@ -712,6 +712,13 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 				resp.Agent.McpConfig = merged
 			}
 		}
+		if resp.Agent != nil {
+			if merged, err := mergeIssuesMCPConfig(resp.Agent.McpConfig, resp.WorkspaceID); err != nil {
+				slog.Warn("issues: merge mcp config failed", "error", err)
+			} else {
+				resp.Agent.McpConfig = merged
+			}
+		}
 		slog.Info("knowledge.claim",
 			"workspace_id", resp.WorkspaceID,
 			"task_id", uuidToString(task.ID),
@@ -750,6 +757,27 @@ func mergeKnowledgeMCPConfig(existing json.RawMessage, workspaceID string) (json
 	servers["hira-knowledge"] = map[string]any{
 		"command": "hira",
 		"args":    []string{"mcp", "knowledge", "--workspace-id", workspaceID},
+	}
+	root["mcpServers"] = servers
+	return json.Marshal(root)
+}
+
+// mergeIssuesMCPConfig injects the hira-issues MCP server entry alongside any
+// existing servers. Uses the same pattern as mergeKnowledgeMCPConfig.
+func mergeIssuesMCPConfig(existing json.RawMessage, workspaceID string) (json.RawMessage, error) {
+	root := map[string]any{}
+	if len(existing) > 0 {
+		if err := json.Unmarshal(existing, &root); err != nil {
+			root = map[string]any{}
+		}
+	}
+	servers, _ := root["mcpServers"].(map[string]any)
+	if servers == nil {
+		servers = map[string]any{}
+	}
+	servers["hira-issues"] = map[string]any{
+		"command": "hira",
+		"args":    []string{"mcp", "issues", "--workspace-id", workspaceID},
 	}
 	root["mcpServers"] = servers
 	return json.Marshal(root)
